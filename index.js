@@ -1,23 +1,31 @@
 const express = require('express');
 const database = require('./db/db');
 const {validUser} = require('./middleware/validUser');
+const cors = require('cors');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
+app.use(cors({origin: true, credentials: true}));
 
 // get userid and amount route
-app.get('/dashboard', validUser, async(req, res)=>{
-    const email = req.body.email;
-    const password = req.body.password;
+app.get('/', (req, res)=>{
+    res.send("Server is Running");
+});
 
-    const userId = await database.User.findOne({email, password});
+app.post('/dashboard', validUser, async(req, res)=>{
+    // const email = req.body.email;
+    // const password = req.body.password;
+    const _id = req.body.userId;
+
+    const userId = await database.User.findOne({_id});
     const getAmountFromId = await database.Accounts.findOne({refTo: userId._id});
 
     res.send({
         amount: getAmountFromId.amount,
-        uId: userId._id
+        uId: userId._id,
+        email: userId.email
     })
 });
 
@@ -33,19 +41,21 @@ app.post('/signup', async (req, res)=>{
             password
         }); 
         // initializing users account with 10 ruppees
-        const initializeAccount = await database.Accounts.create({
-            amount: 10.0,
-            refTo: curUser._id
-        })
+        if(curUser){
+            const initializeAccount = await database.Accounts.create({
+                amount: 10.0,
+                refTo: curUser._id
+            })
 
-        res.send({
-            message: 'User Created Successfully',
-            balance: initializeAccount.amount
-        });
+            return res.send({
+                message: "User Created Successfully",
+                newUserId: curUser._id
+            });
+        }
 
     }
     catch(e){
-        res.send({
+        return res.send({
             message: 'Internal Server Error / Account Already Exists (try with new email and password)'
         })
     }
@@ -53,47 +63,69 @@ app.post('/signup', async (req, res)=>{
 });
 
 // signin route
-app.post('/signin', async (req, res)=>{
-    const email = req.body.email;
-    const password = req.body.password;
+app.post('/signin', async (req, res) => {
+    try {
+        const email = req.body.email;
+        const password = req.body.password;
 
-    const userExists = await database.User.findOne({
-        email,
-        password
-    });
+        const userExists = await database.User.findOne({
+            email,
+            password
+        });
 
-    if(userExists){
-        res.send({
-            userId: userExists._id
-        })
-    }
-    else{
-        res.send({
-            message: "User doesn't exists"
-        })
+        if (userExists) {
+            const balance = await database.Accounts.findOne({
+                refTo: userExists._id
+            });
+
+            return res.json({
+                userId: userExists._id,
+                balance: balance.amount
+            });
+        } else {
+            return res.status(404).json({
+                message: "User doesn't exist"
+            });
+        }
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({
+            message: "Internal Server Error"
+        });
     }
 });
+
 // refer route
-app.put('/refer', async (req, res)=>{
-    const curUserId = req.body.id;
-    const referedInd = req.body.referedId;
+app.put('/refer', async (req, res) => {
+    try {
+        const curUserId = req.body.id;
+        const referedInd = req.body.referedId;
 
-    await database.Accounts.updateOne(
-        {refTo: curUserId}, 
-        {$inc: 
-            {amount: 50}
-        }
-    );
-    await database.Accounts.updateOne(
-        {refTo: referedInd}, 
-        {$inc: 
-            {amount: 50}
-        }
-    );
-    res.send({
-        message: 'Value Updated Successfully'
-    })
+        await database.Accounts.updateOne(
+            { refTo: curUserId },
+            {
+                $inc: { amount: 50 }
+            }
+        );
+
+        await database.Accounts.updateOne(
+            { refTo: referedInd },
+            {
+                $inc: { amount: 50 }
+            }
+        );
+
+        res.json({
+            message: 'Value Updated Successfully'
+        });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({
+            message: 'Internal Server Error'
+        });
+    }
 });
+
 
 app.listen(PORT,()=>{
     console.log("Server running on port " + PORT);
