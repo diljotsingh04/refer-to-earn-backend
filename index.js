@@ -43,7 +43,7 @@ app.post('/signup', async (req, res)=>{
         // initializing users account with 10 ruppees
         if(curUser){
             const initializeAccount = await database.Accounts.create({
-                amount: 10.0,
+                amount: 10,
                 refTo: curUser._id
             })
 
@@ -101,20 +101,21 @@ app.put('/refer', async (req, res) => {
         const curUserId = req.body.id;
         const referedInd = req.body.referedId;
 
-        await database.Accounts.updateOne(
+        const val1 = await database.Accounts.updateOne(
             { refTo: curUserId },
             {
                 $inc: { amount: 50 }
             }
         );
 
-        await database.Accounts.updateOne(
+        const val2 = await database.Accounts.updateOne(
             { refTo: referedInd },
             {
                 $inc: { amount: 50 }
             }
         );
-
+        
+        console.log(val1, val2)
         res.json({
             message: 'Value Updated Successfully'
         });
