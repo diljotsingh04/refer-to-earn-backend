@@ -115,7 +115,7 @@ app.put('/refer', async (req, res) => {
             }
         );
         
-        console.log(val1, val2)
+        // console.log(val1, val2)
         res.json({
             message: 'Value Updated Successfully'
         });
